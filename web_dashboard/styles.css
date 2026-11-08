@@ -1,0 +1,173 @@
+/* Layout: white instrument rails above and below; the sky between them is the plot, and the flight is drawn on it. */
+:root{
+  --page:#f5f7fa;        /* behind the rails */
+  --panel:#ffffff;       /* rail surface */
+  --ink:#0d1117;
+  --ink-2:#2a323c;
+  --dim:#5e6775;         /* field labels */
+  --dim-2:#9aa4b0;       /* ticks, inactive */
+  --rule:#e2e6ec;
+  --hot:#cf6b2a;         /* thrust, live values, the rocket */
+  --hot-2:#ffb067;       /* plume, rocket over deep sky */
+  --go:#2a9d8f;          /* nominal, armed, checked */
+  --ground:#cbd2db;
+  --sky-1:#2e5ea0; --sky-2:#5a92ce; --sky-3:#8fbce4; --sky-4:#c3dcf2; --sky-5:#e8f2fb;
+  --plate:rgba(255,255,255,.93);
+  --grid:rgba(255,255,255,.55);
+  --sans:"Archivo",system-ui,sans-serif;
+  --mono:"Martian Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#0d1117; --panel:#11161c; --ink:#e4e9ef; --ink-2:#c0c9d4; --dim:#9aa4b0; --dim-2:#5e6775;
+  --rule:#2a323c; --hot:#ffb067; --hot-2:#cf6b2a; --go:#2a9d8f; --ground:#1b222b;
+  --sky-1:#07101c; --sky-2:#0f2540; --sky-3:#1b4066; --sky-4:#2a5882; --sky-5:#3d6e97;
+  --plate:rgba(13,17,23,.86); --grid:rgba(255,255,255,.22);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --page:#0d1117; --panel:#11161c; --ink:#e4e9ef; --ink-2:#c0c9d4; --dim:#9aa4b0; --dim-2:#5e6775;
+  --rule:#2a323c; --hot:#ffb067; --hot-2:#cf6b2a; --go:#2a9d8f; --ground:#1b222b;
+  --sky-1:#07101c; --sky-2:#0f2540; --sky-3:#1b4066; --sky-4:#2a5882; --sky-5:#3d6e97;
+  --plate:rgba(13,17,23,.86); --grid:rgba(255,255,255,.22);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--page);color:var(--ink);
+  font-family:var(--sans);font-variant-numeric:tabular-nums;
+  display:flex;flex-direction:column;min-height:100%;
+}
+.gutter{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ── mockup chrome (not part of the product screen) ───────────── */
+.chrome{background:var(--page);border-bottom:1px solid var(--rule)}
+.chrome-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:9px}
+.mark{font-size:14px;font-weight:600;letter-spacing:.01em}
+.mark span{color:var(--dim);font-weight:400}
+.phases{display:flex;gap:2px;margin-left:auto;flex-wrap:wrap}
+.phases button{
+  font-family:var(--sans);font-size:11.5px;font-weight:600;letter-spacing:.07em;
+  background:transparent;color:var(--dim);border:1px solid transparent;border-radius:4px;
+  padding:5px 10px;cursor:pointer;
+}
+.phases button:hover{color:var(--ink)}
+.phases button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.phases button:focus-visible,.bigbtn:focus-visible,.pill:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.bigbtn{
+  font-family:var(--sans);font-size:11.5px;font-weight:600;letter-spacing:.07em;
+  border:1px solid var(--hot);background:var(--hot);color:#fff;border-radius:4px;padding:5px 13px;cursor:pointer;
+}
+.scrub{flex:1 1 180px;min-width:0;display:flex;align-items:center;gap:9px}
+.scrub input{
+  flex:1;min-width:0;appearance:none;height:6px;border-radius:4px;
+  background:linear-gradient(to right,var(--hot) 0%,var(--hot) var(--progress,0%),#3c3c3c var(--progress,0%),#3c3c3c 100%);
+  cursor:pointer;
+}
+.scrub input::-webkit-slider-thumb{appearance:none;width:16px;height:11px;border:0;border-radius:8px;background:#fff}
+.scrub input::-moz-range-thumb{width:16px;height:11px;border:0;border-radius:8px;background:#fff}
+
+/* ── top data rail ────────────────────────────────────────────── */
+.rail-top{background:var(--panel);border-bottom:1px solid var(--rule)}
+.rail-top-in{display:flex;align-items:flex-start;gap:28px;flex-wrap:wrap;padding-block:15px}
+.clock{font-family:var(--mono);font-weight:500;font-size:clamp(21px,3.6vw,33px);line-height:1;letter-spacing:-.04em}
+.clock small{display:block;font-family:var(--sans);font-size:10.5px;letter-spacing:.11em;font-weight:500;color:var(--dim-2);margin-top:8px}
+/* every time on the screen lives in this block: elapsed on the left, the next event on the right */
+.clockwrap{display:flex;align-items:stretch;gap:17px}
+.cdn{display:flex;flex-direction:column;justify-content:space-between;border-left:1px solid var(--rule);padding-left:17px}
+.cdn:empty{display:none}
+.cdn i{font-style:normal;font-family:var(--mono);font-weight:500;font-size:clamp(17px,2.6vw,25px);line-height:1;letter-spacing:-.04em;color:var(--hot)}
+.cdn small{display:block;font-size:10.5px;letter-spacing:.11em;font-weight:500;color:var(--dim-2);margin-top:8px}
+.fields{display:flex;gap:28px;flex-wrap:wrap;flex:1 1 300px;min-width:0}
+.field{min-width:0}
+.field b{display:block;font-size:10.5px;letter-spacing:.11em;font-weight:600;color:var(--dim);margin-bottom:6px}
+.field i{font-style:normal;display:block;font-family:var(--mono);font-weight:500;font-size:clamp(15px,2.1vw,20px);line-height:1;letter-spacing:-.04em}
+.field.live i{color:var(--hot)}
+.arrow{font-family:var(--sans);font-weight:700;font-size:.8em;padding-right:3px}
+
+/* pad checklist */
+.check{display:flex;flex-direction:column;gap:6px;flex:1 1 210px}
+.check>b{font-size:10.5px;letter-spacing:.11em;font-weight:600;color:var(--dim)}
+.check label{display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer}
+.check input{appearance:none;width:14px;height:14px;border:1.5px solid var(--dim-2);border-radius:3px;flex:none;position:relative}
+.check input:checked{background:var(--go);border-color:var(--go)}
+.check input:checked::after{content:"";position:absolute;left:4px;top:.5px;width:4px;height:8.5px;border:solid #fff;border-width:0 1.7px 1.7px 0;transform:rotate(42deg)}
+.check input:checked+span{color:var(--dim)}
+
+/* link cluster */
+.link{display:flex;gap:18px;align-items:flex-start}
+.link div{text-align:right}
+.link b{display:block;font-size:10px;letter-spacing:.11em;color:var(--dim);font-weight:600;margin-bottom:6px}
+.link i{font-style:normal;font-family:var(--mono);font-size:12.5px;font-weight:500;letter-spacing:-.04em;display:flex;align-items:center;gap:5px;justify-content:flex-end}
+
+/* ── plot ─────────────────────────────────────────────────────── */
+.plot{flex:1 1 auto;display:flex;min-height:0;background:var(--sky-5)}
+.plot svg{width:100%;height:auto;max-width:100%;display:block}
+.tick{font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.04em}
+.mk-name{font-family:var(--sans);font-size:12.5px;font-weight:600;fill:var(--ink)}
+.mk-val{font-family:var(--mono);font-size:10px;font-weight:400;letter-spacing:-.04em;fill:var(--dim)}
+
+/* ── bottom context rail ──────────────────────────────────────── */
+.rail-bot{background:var(--panel);border-top:1px solid var(--rule)}
+.rail-bot-in{display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding-block:13px;min-height:60px}
+.pred{display:flex;gap:11px;align-items:baseline}
+.pred b{font-size:10.5px;letter-spacing:.11em;color:var(--dim);font-weight:600}
+.pred i{font-style:normal;font-family:var(--mono);font-weight:500;font-size:16px;letter-spacing:-.04em}
+.pill{font-family:var(--sans);font-size:12.5px;font-weight:600;background:transparent;color:var(--ink);border:1px solid var(--rule);border-radius:4px;padding:7px 15px;cursor:pointer}
+.pill:hover{border-color:var(--ink);background:var(--ink);color:var(--panel)}
+.pill.go{border-color:var(--go);color:var(--go)}
+.pill.go:hover{background:var(--go);border-color:var(--go);color:#fff}
+select{font-family:var(--sans);font-size:12.5px;background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:4px;padding:7px 9px;max-width:100%}
+.flights{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+.flights b{font-size:10.5px;letter-spacing:.11em;color:var(--dim);font-weight:600}
+.flights a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule);padding-bottom:2px}
+.flights a:hover{border-color:var(--hot);color:var(--hot)}
+.spacer{margin-left:auto}
+@media (max-width:640px){
+  .rail-top-in{gap:18px}
+  .fields{gap:20px}
+  .link{order:3;width:100%;justify-content:flex-start}
+  .link div{text-align:left}
+  .link i{justify-content:flex-start}
+  .spacer{margin-left:0}
+  .plot{display:block;flex:0 0 auto}
+  .plot svg{height:auto;aspect-ratio:1000 / 520}
+}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none!important}}
+.pulse{animation:pulse 1.7s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.34}50%{opacity:0}}
+@media (min-width:900px){
+  .gutter{padding-left:11px;padding-right:11px}
+  .chrome-in{gap:10px;padding-block:6px}
+  .mark{font-size:10px}
+  .phases button{font-size:8px;padding:4px 7px}
+  .bigbtn{font-size:8px;padding:4px 9px}
+  .scrub{gap:6px}
+  .rail-top-in{gap:20px;padding-block:10px}
+  .clock{font-size:23px}
+  .clock small{font-size:7.5px;margin-top:6px}
+  .clockwrap{gap:12px}
+  .cdn{padding-left:12px}
+  .cdn i{font-size:18px}
+  .cdn small{font-size:7.5px;margin-top:6px}
+  .fields{gap:20px}
+  .field b{font-size:7.5px;margin-bottom:4px}
+  .field i{font-size:14px}
+  .check{gap:4px;flex-basis:147px}
+  .check>b{font-size:7.5px}
+  .check label{gap:6px;font-size:9.5px}
+  .check input{width:10px;height:10px;border-width:1px}
+  .check input:checked::after{left:3px;top:0;width:3px;height:6px;border-width:0 1px 1px 0}
+  .link{gap:13px}
+  .link b{font-size:7px;margin-bottom:4px}
+  .link i{font-size:9px;gap:4px}
+  .link svg{width:14px;height:9px}
+  .rail-bot-in{gap:17px;padding-block:9px;min-height:42px}
+  .pred{gap:8px}
+  .pred b{font-size:7.5px}
+  .pred i{font-size:11px}
+  .pill,select{font-size:9px;padding:5px 10px}
+  .flights{gap:6px;font-size:9px}
+  .flights b{font-size:7.5px}
+}

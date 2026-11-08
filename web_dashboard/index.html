@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All phases — one screen · Pathfinder II</title>
+<meta name="description" content="Pathfinder II ground station — one screen that swaps its fields by flight phase, with altitude, time and distance drawn on the sky.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&amp;family=Martian+Mono:wght@300..600&amp;display=swap">
+<link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+<div class="chrome"><div class="chrome-in gutter">
+  <div class="mark">Pathfinder II <span>· Flight 04 · screen mockup</span></div>
+  <div class="scrub">
+    <button class="bigbtn" id="play" type="button">Fly it</button>
+    <input id="t" type="range" min="-12" max="132" step="0.1" value="-12" aria-label="Flight time">
+  </div>
+  <div class="phases" id="phases"><button type="button" data-ph="pad" aria-pressed="false">PAD</button><button type="button" data-ph="boost" aria-pressed="false">BOOST</button><button type="button" data-ph="coast" aria-pressed="true">COAST</button><button type="button" data-ph="descent" aria-pressed="false">DESCENT</button><button type="button" data-ph="summary" aria-pressed="false">SUMMARY</button></div>
+</div></div>
+
+<div class="rail-top"><div class="rail-top-in gutter">
+  <div class="clockwrap">
+    <div class="clock" id="clock">T+00:00:08.0<small>MISSION CLOCK</small></div>
+    <div class="cdn" id="cdn"><i>6.6 s</i><small>APOGEE IN</small></div>
+  </div>
+  <div class="fields" id="fields"><div class="field live"><b>ALTITUDE</b><i>2,651 ft</i></div>
+    <div class="field live"><b>CLIMB RATE</b><i><span class="arrow">▲</span>146 mph</i></div>
+    <div class="field"><b>ACCELERATION</b><i>0.5 G</i></div>
+    <div class="field"><b>DISTANCE FROM PAD</b><i>239 ft</i></div></div>
+  <div class="link spacer" id="link"><div><b>LINK</b><i><svg width="20" height="13" viewBox="0 0 20 13" aria-hidden="true"><rect x="0" y="8.3" width="3.2" height="2.7" rx="1" fill="var(--go)"></rect><rect x="5" y="5.6" width="3.2" height="5.4" rx="1" fill="var(--go)"></rect><rect x="10" y="2.8999999999999986" width="3.2" height="8.100000000000001" rx="1" fill="var(--go)"></rect><rect x="15" y="0.1999999999999993" width="3.2" height="10.8" rx="1" fill="var(--go)"></rect></svg> 915 MHz</i></div>
+    <div><b>AIRFRAME</b><i>7.9 V</i></div>
+    <div><b>SATS</b><i>9</i></div>
+    <div><b>TEMP</b><i>72°F</i></div></div>
+</div></div>
+
+<div class="plot"><svg id="svg" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Flight trajectory: altitude against distance from the pad"></svg></div>
+
+<div class="rail-bot"><div class="rail-bot-in gutter" id="bot"><div class="pred"><b>PROJECTED APOGEE</b><i>3,386 ft</i></div></div></div>
+
+<script src="app.js"></script>
+
+
+</body></html>
