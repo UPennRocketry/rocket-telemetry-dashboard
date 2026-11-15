@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <LoRa.h>
+#include "position_packet.h"
 
 // Feather M0 with the built-in RFM9x radio.
 constexpr int RFM95_CS = 8;
@@ -7,7 +8,7 @@ constexpr int RFM95_RST = 4;
 constexpr int RFM95_INT = 3;
 
 // These settings must match the transmitter.
-constexpr long RADIO_FREQUENCY_HZ = 434000000;
+constexpr long RADIO_FREQUENCY_HZ = 433000000;
 constexpr long RADIO_BANDWIDTH_HZ = 125000;
 constexpr int RADIO_SPREADING_FACTOR = 7;
 constexpr int RADIO_CODING_RATE = 5;  // 4/5
@@ -32,7 +33,7 @@ void setup() {
   LoRa.setSpreadingFactor(RADIO_SPREADING_FACTOR);
   LoRa.setCodingRate4(RADIO_CODING_RATE);
   LoRa.setSyncWord(RADIO_SYNC_WORD);
-  Serial.println("Listening on 434 MHz, BW 125 kHz, SF7, CR 4/5, sync 0x12.");
+  Serial.println("Listening on 433 MHz, BW 125 kHz, SF7, CR 4/5, sync 0x12.");
   Serial.println("Waiting for LoRa packets...");
 }
 
@@ -47,8 +48,24 @@ void loop() {
   Serial.print(" bytes, RSSI ");
   Serial.print(LoRa.packetRssi());
   Serial.println(" dBm):");
-  while (LoRa.available()) {
-    Serial.write(static_cast<uint8_t>(LoRa.read()));
+  char payload[256];
+  int length = 0;
+  bool textPacket = true;
+  while (LoRa.available() && length < 255) {
+    const uint8_t byte = static_cast<uint8_t>(LoRa.read());
+    Serial.write(byte);
+    payload[length++] = static_cast<char>(byte);
+    if (byte == 0) {
+      textPacket = false;
+    }
   }
   Serial.println();
+  payload[length] = '\0';
+
+  if (textPacket && isPositionPacket(payload)) {
+    Serial.print("Position (latitude degrees, longitude degrees, altitude metres): ");
+    Serial.println(payload + 4);
+  } else if (textPacket && strncmp(payload, "POS,", 4) == 0) {
+    Serial.println("ERROR: Invalid position packet.");
+  }
 }
