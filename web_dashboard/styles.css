@@ -171,3 +171,6 @@ select{font-family:var(--sans);font-size:12.5px;background:var(--panel);color:va
   .flights{gap:6px;font-size:9px}
   .flights b{font-size:7.5px}
 }
+.serial-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 10px; padding-bottom: 10px; }
+.serial-bar [hidden] { display: none; }
+#radio-status { font-size: 13px; }

@@ -18,6 +18,12 @@
   <div class="phases" id="phases"><button type="button" data-ph="pad" aria-pressed="false">PAD</button><button type="button" data-ph="boost" aria-pressed="false">BOOST</button><button type="button" data-ph="coast" aria-pressed="true">COAST</button><button type="button" data-ph="descent" aria-pressed="false">DESCENT</button><button type="button" data-ph="summary" aria-pressed="false">SUMMARY</button></div>
 </div></div>
 
+<div class="serial-bar gutter">
+  <button class="pill" id="connect-radio" type="button">Connect receiver</button>
+  <button class="pill" id="disconnect-radio" type="button" hidden>Disconnect / return to demo</button>
+  <span id="radio-status" role="status">Demo mode — simulated flight, no radio connected.</span>
+</div>
+
 <div class="rail-top"><div class="rail-top-in gutter">
   <div class="clockwrap">
     <div class="clock" id="clock">T+00:00:08.0<small>MISSION CLOCK</small></div>
@@ -37,6 +43,7 @@
 
 <div class="rail-bot"><div class="rail-bot-in gutter" id="bot"><div class="pred"><b>PROJECTED APOGEE</b><i>3,386 ft</i></div></div></div>
 
+<script src="telemetry.js"></script>
 <script src="app.js"></script>
 
 

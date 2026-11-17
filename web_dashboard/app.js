@@ -104,15 +104,15 @@ function drawPlot(t,ph){
   s+=`<ellipse cx="${px(0)}" cy="${GY}" rx="7" ry="9" fill="none" stroke="var(--ink)" stroke-width="1.6"/>`;
   if(ph==="pad") s+=`<path d="M${px(0)} ${GY-13} l5 11 h-10 z" fill="var(--hot)"/>`;
   // predicted profile the flown line is tracking against
-  if(live) s+=`<path d="${path(LAND)}" fill="none" stroke="var(--grid)" stroke-width="1.5" stroke-dasharray="3 7"/>`;
+  if(live&&!radioMode) s+=`<path d="${path(LAND)}" fill="none" stroke="var(--grid)" stroke-width="1.5" stroke-dasharray="3 7"/>`;
   // flown path, with a soft plume glow behind it
-  if(t>0){
-    const d=path(Math.min(t,LAND));
+  if((radioMode && radioPoints.length) || (!radioMode && t>0)){
+    const d=radioMode ? radioPoints.map((p,i)=>(i?"L":"M")+px(p.distance).toFixed(1)+" "+py(p.altitude).toFixed(1)).join("") : path(Math.min(t,LAND));
     s+=`<path d="${d}" fill="none" stroke="var(--hot-2)" stroke-width="7" stroke-opacity=".28" stroke-linecap="round"/>`;
     s+=`<path d="${d}" fill="none" stroke="var(--hot)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
   // markers dropped in the rocket's wake
-  MARKS.forEach(m=>{
+  if(!radioMode) MARKS.forEach(m=>{
     if(t<m.t-0.01) return;
     const x=px(down(m.t)), y=py(alt(m.t));
     const lx=x+m.dx, ly=y+m.dy;
@@ -121,11 +121,13 @@ function drawPlot(t,ph){
     s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="var(--panel)" stroke="var(--ink)" stroke-width="2"/>`;
   });
   // the rocket
-  if(t>0&&t<LAND){
-    const x=px(down(t)), y=py(alt(t));
+  if((radioMode&&radioPoints.length) || (!radioMode&&t>0&&t<LAND)){
+    const sample=radioMode?radioPoints[radioPoints.length-1]:null;
+    const altitude=sample?sample.altitude:alt(t), distance=sample?sample.distance:down(t);
+    const x=px(distance), y=py(altitude);
     s+=`<circle class="pulse" cx="${x}" cy="${y}" r="14" fill="var(--hot-2)"/>`;
     s+=`<circle cx="${x}" cy="${y}" r="6" fill="var(--hot)" stroke="var(--panel)" stroke-width="1.6"/>`;
-    s+=plate(x+16,y+(t<APO?34:40),ft(alt(t))+" ft",ft(down(t))+" ft from pad","start");
+    s+=plate(x+16,y+(t<APO?34:40),ft(altitude)+" ft",ft(distance)+" ft from pad","start");
   }
   document.getElementById("svg").innerHTML=s;
 }
@@ -191,10 +193,30 @@ const PH_T={pad:-12,boost:1.2,coast:8,descent:56,summary:LAND};
 document.getElementById("phases").innerHTML=PH.map(([k,l])=>`<button type="button" data-ph="${k}" aria-pressed="false">${l}</button>`).join("");
 
 let T=-12, playing=false, raf=null, last=0;
+let radioMode=false, radioPoints=[], radioLastSequence=null, radioReceivedAt=0;
 const checklist={c1:true,c2:true,c3:false,c4:false};
 let selectedPort=PORTS[0];
 function render(){
   const ph=phaseOf(T);
+  if(radioMode){
+    const sample=radioPoints[radioPoints.length-1];
+    document.getElementById("clock").innerHTML=sample
+      ? `${clockStr(sample.t)}<small>SIMULATED MISSION CLOCK — RADIO</small>`
+      : `--<small>WAITING FOR SIMULATED RADIO PACKET</small>`;
+    document.getElementById("cdn").innerHTML="";
+    document.getElementById("fields").innerHTML=sample
+      ? `<div class="field live"><b>ALTITUDE</b><i>${ft(sample.altitude)} ft</i></div>
+         <div class="field live"><b>SPEED</b><i>${sample.velocity.toFixed(1)} mph</i></div>
+         <div class="field"><b>ACCELERATION</b><i>${sample.acceleration.toFixed(2)} G</i></div>
+         <div class="field"><b>DISTANCE FROM PAD</b><i>${ft(sample.distance)} ft</i></div>`
+      : `<div class="field"><b>SIMULATED FLIGHT</b><i>Waiting for data</i></div>`;
+    document.getElementById("link").innerHTML=`<div><b>LINK</b><i>433 MHz · SIMULATED</i></div>`;
+    document.getElementById("bot").innerHTML=`<div class="pred"><b>RADIO MODE</b><i>Plot shows received samples only</i></div>`;
+    drawPlot(T,ph);
+    document.querySelectorAll("#phases button").forEach(b=>b.setAttribute("aria-pressed",sample && b.dataset.ph===ph ? "true" : "false"));
+    document.getElementById("t").value=T;
+    return;
+  }
   document.getElementById("clock").innerHTML=
     (ph==="summary"?`02:07.3<small>FLIGHT DURATION — FROZEN AT TOUCHDOWN</small>`
      :ph==="pad"?`${clockStr(T)}<small>HOLDING — CLOCK STARTS AT LIFTOFF</small>`
@@ -221,12 +243,14 @@ function step(ts){
 }
 function stop(){playing=false;last=0;document.getElementById("play").textContent="Fly it";if(raf)cancelAnimationFrame(raf);}
 function play(){
+  if(radioMode) return;
   if(playing){stop();render();return;}
   playing=true;T=-12;last=0;document.getElementById("play").textContent="Stop";raf=requestAnimationFrame(step);
 }
 document.getElementById("play").addEventListener("click",play);
-document.getElementById("t").addEventListener("input",e=>{stop();T=parseFloat(e.target.value);render();});
+document.getElementById("t").addEventListener("input",e=>{if(radioMode)return;stop();T=parseFloat(e.target.value);render();});
 document.getElementById("phases").addEventListener("click",e=>{
+  if(radioMode) return;
   const b=e.target.closest("button"); if(!b) return;
   stop(); T=PH_T[b.dataset.ph]; render();
 });
@@ -263,4 +287,122 @@ document.getElementById("bot").addEventListener("click",e=>{
     alert("Earlier flights are not connected in this mockup.");
   }
 });
+
+const radioStatus=document.getElementById("radio-status");
+const connectRadio=document.getElementById("connect-radio");
+const disconnectRadio=document.getElementById("disconnect-radio");
+let serialReader=null, serialTask=null, radioError="", serialCloseError="";
+
+function setRadioControls(active){
+  connectRadio.hidden=active;
+  disconnectRadio.hidden=!active;
+  document.getElementById("play").disabled=active;
+  document.getElementById("t").disabled=active;
+  document.querySelectorAll("#phases button").forEach(button=>button.disabled=active);
+}
+function updateRadioStatus(){
+  if(!radioMode) return;
+  if(radioError) radioStatus.textContent=radioError;
+  else if(!radioReceivedAt) radioStatus.textContent="Receiver connected — waiting for SIM_FLIGHT packets.";
+  else if(Date.now()-radioReceivedAt>5000) radioStatus.textContent="SIMULATED RADIO — no packet for over 5 seconds; displaying last received data.";
+  else radioStatus.textContent=`SIMULATED RADIO · 433 MHz · packet ${radioLastSequence}`;
+}
+function acceptRadioLine(line){
+  if(!line.startsWith("SIM_FLIGHT,")) return;
+  const sample=FlightTelemetry.parseFlightPacket(line);
+  if(!sample){
+    radioError="Invalid SIM_FLIGHT packet ignored; check firmware and serial data.";
+    updateRadioStatus();
+    return;
+  }
+  if(radioLastSequence!==null && sample.seq<=radioLastSequence){
+    if(sample.seq===radioLastSequence ||
+       (sample.t>=radioPoints[radioPoints.length-1].t && Date.now()-radioReceivedAt<=5000)) return;
+    radioPoints=[];
+  }
+  if(radioPoints.length && sample.t<radioPoints[radioPoints.length-1].t) radioPoints=[];
+  radioLastSequence=sample.seq;
+  radioPoints.push(sample);
+  if(radioPoints.length>145) radioPoints.shift();
+  radioReceivedAt=Date.now();
+  radioError="";
+  T=sample.t;
+  updateRadioStatus();
+  render();
+}
+async function readRadio(port){
+  const decoder=new TextDecoder();
+  const lines=new FlightTelemetry.LineBuffer(acceptRadioLine,()=>{
+    radioError="Serial line too long; discarded.";
+    updateRadioStatus();
+  });
+  try{
+    serialReader=port.readable.getReader();
+    while(true){
+      const {value,done}=await serialReader.read();
+      if(done) break;
+      lines.push(decoder.decode(value,{stream:true}));
+    }
+    if(radioMode) radioError="Receiver serial stream closed. Disconnect and reconnect to try again.";
+  }catch(error){
+    if(radioMode) radioError=`Receiver serial error: ${error.message}`;
+  }finally{
+    if(serialReader){serialReader.releaseLock();serialReader=null;}
+    try { await port.close(); }
+    catch(error) {
+      serialCloseError=`Could not close receiver port: ${error.message}`;
+      if(radioMode) radioError=serialCloseError;
+    }
+    updateRadioStatus();
+  }
+}
+connectRadio.addEventListener("click",async()=>{
+  if(!("serial" in navigator)){
+    radioStatus.textContent="Web Serial unavailable. Use Chrome or Edge on localhost.";
+    return;
+  }
+  connectRadio.disabled=true;
+  let port=null, opened=false;
+  try{
+    port=await navigator.serial.requestPort();
+    await port.open({baudRate:115200});
+    opened=true;
+    await port.setSignals({dataTerminalReady:true});
+    stop();
+    radioMode=true; radioPoints=[]; radioLastSequence=null; radioReceivedAt=0; radioError=""; serialCloseError=""; T=-12;
+    setRadioControls(true);
+    updateRadioStatus();
+    render();
+    serialTask=readRadio(port);
+  }catch(error){
+    radioStatus.textContent=`Could not connect receiver: ${error.message}`;
+    if(opened){
+      try { await port.close(); }
+      catch(closeError) { radioStatus.textContent+=` Could not close port: ${closeError.message}`; }
+    }
+  }finally{
+    connectRadio.disabled=false;
+  }
+});
+disconnectRadio.addEventListener("click",async()=>{
+  disconnectRadio.disabled=true;
+  radioMode=false;
+  try{
+    if(serialReader) await serialReader.cancel();
+    if(serialTask) await serialTask;
+    if(serialCloseError) throw new Error(serialCloseError);
+  }catch(error){
+    radioStatus.textContent=`Error disconnecting receiver: ${error.message}`;
+    disconnectRadio.disabled=false;
+    radioMode=true;
+    return;
+  }
+  serialTask=null;
+  setRadioControls(false);
+  disconnectRadio.disabled=false;
+  radioStatus.textContent="Demo mode — simulated flight, no radio connected.";
+  T=-12;
+  render();
+});
+setInterval(updateRadioStatus,1000);
 render();

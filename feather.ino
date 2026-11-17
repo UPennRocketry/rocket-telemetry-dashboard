@@ -53,14 +53,31 @@ void loop() {
   bool textPacket = true;
   while (LoRa.available() && length < 255) {
     const uint8_t byte = static_cast<uint8_t>(LoRa.read());
-    Serial.write(byte);
     payload[length++] = static_cast<char>(byte);
-    if (byte == 0) {
+    if ((byte < 0x20 && byte != '\r' && byte != '\n' && byte != '\t') ||
+        byte > 0x7e) {
       textPacket = false;
     }
   }
-  Serial.println();
   payload[length] = '\0';
+
+  if (textPacket) {
+    Serial.write(reinterpret_cast<const uint8_t *>(payload), length);
+    Serial.println();
+  } else {
+    Serial.print("Binary payload (hex): ");
+    for (int i = 0; i < length; ++i) {
+      const uint8_t byte = static_cast<uint8_t>(payload[i]);
+      if (byte < 0x10) {
+        Serial.print('0');
+      }
+      Serial.print(byte, HEX);
+      if (i + 1 < length) {
+        Serial.print(' ');
+      }
+    }
+    Serial.println();
+  }
 
   if (textPacket && isPositionPacket(payload)) {
     Serial.print("Position (latitude degrees, longitude degrees, altitude metres): ");
